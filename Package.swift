@@ -30,5 +30,8 @@ let package = Package(
                 "SPM",
             ])
     ],
+    swiftSettings: [
+        .define("SQLITE_ENABLE_FTS5")
+    ],
     swiftLanguageVersions: [.v4_2, .version("5")]
 )
