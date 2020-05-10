@@ -111,6 +111,11 @@ public struct Configuration {
     /// [**Experimental**](http://github.com/groue/GRDB.swift#what-are-experimental-features)
     public var observesSuspensionNotifications = false
     
+    /// When true, listen to UIApplicationDidEnterBackgroundNotification and
+    /// UIApplicationDidReceiveMemoryWarningNotification in order to release
+    /// as much memory as possible.
+    public var setupAutomaticMemoryManagement = true
+
     // MARK: - Encryption
     
     #if SQLITE_HAS_CODEC
