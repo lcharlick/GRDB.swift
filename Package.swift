@@ -18,10 +18,7 @@ let package = Package(
             name: "GRDB",
             dependencies: ["sqlite3"],
             path: "GRDB",
-            swiftSettings: [
-                .define("SQLITE_ENABLE_FTS5"),
-                .define("SQLITE_ENABLE_PREUPDATE_HOOK")
-            ]),
+            swiftSettings: [.define("SQLITE_ENABLE_FTS5")]),
         .testTarget(
             name: "GRDBTests",
             dependencies: ["GRDB"],
