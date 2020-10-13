@@ -5,6 +5,7 @@ Migrating From GRDB 4 to GRDB 5
 
 - [Preparing the Migration to GRDB 5](#preparing-the-migration-to-grdb-5)
 - [New requirements](#new-requirements)
+- [Database Configuration](#database-configuration)
 - [ValueObservation](#valueobservation)
 - [Combine Integration](#combine-integration)
 - [Other Changes](#other-changes)
@@ -29,6 +30,35 @@ GRDB requirements have been bumped:
 - **macOS 10.10+** (was macOS 10.9+)
 - tvOS 9.0+ (unchanged)
 - watchOS 2.0+ (unchanged)
+
+
+## Database Configuration
+
+The way to configure a database relies much more on the `Configuration.prepareDatabase(_:)` method:
+
+```swift
+// BEFORE: GRDB 4
+var config = Configuration()
+config.trace = { ... }              // Tracing SQL statements
+config.prepareDatabase = { db in    // prepareDatabase was a property
+    ...                             // Custom setup
+}
+let dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
+dbQueue.add(function: ...)          // Custom SQL function
+dbQueue.add(collation: ...)         // Custom collation
+dbQueue.add(tokenizer: ...)         // Custom FTS5 tokenizer
+
+// NEW: GRDB 5
+var config = Configuration()
+config.prepareDatabase { db in      // prepareDatabase is now a method
+    db.trace { ... }
+    db.add(function: ...)
+    db.add(collation: ...)
+    db.add(tokenizer: ...)
+    ...
+}
+let dbQueue = try DatabaseQueue(dbPath, configuration: config)
+```
 
 
 ## ValueObservation
@@ -337,7 +367,7 @@ let publisher = observation
      
     // NEW: GRDB 5
     var config = Configuration()
-    config.prepareDatabase = { db in
+    config.prepareDatabase { db in
         db.trace { print($0) }
     }
     let dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
@@ -427,11 +457,9 @@ let publisher = observation
     Player.select(myFunction(Column("name")))
     ```
 
-8. Defining custom `FetchRequest` types is now **discouraged**.
+8. Defining custom `FetchRequest` types is no longer supported.
     
-    A future GRDB version will remove the ability to define custom `FetchRequest` types.
-    
-    Our suggestion is to refactor your app so that your custom request type is no longer needed: [SQLRequest] and [QueryInterfaceRequest] are now supposed to fully address your needs. If it is not possible, then please [open an issue](https://github.com/groue/GRDB.swift/issues) and describe your particular use case.
+    Refactor your app around [SQLRequest] and [QueryInterfaceRequest], which are supposed to fully address your needs.
     
 9. The module name for [custom SQLite builds](CustomSQLiteBuilds.md) is now the plain `GRDB`:
     
@@ -457,6 +485,32 @@ let publisher = observation
     let sqliteVersion = String(cString: sqlite3_libversion())
     ```
 
+11. `FetchedRecordsController` was removed from GRDB 5. The [Database Observation] chapter describes the other ways to observe the database.
+
+12. Defining custom `RowAdapter` types is no longer supported. A new [RenameColumnAdapter](../README.md#renamecolumnadapter) adapter makes it possible to process column names.
+
+13. Many types and methods that support the query builder used to be publicly exposed and flagged as experimental. They are now private, or renamed with an underscore prefix, which means they are not for public use.
+
+14. Explicit boolean tests `expression == true` and `expression == false` generate different SQL:
+    
+    ```swift
+    // GRDB 4: SELECT * FROM player WHERE isActive
+    // GRDB 5: SELECT * FROM player WHERE isActive = 1
+    Player.filter(Column("isActive") == true)
+
+    // GRDB 4: SELECT * FROM player WHERE NOT isActive
+    // GRDB 5: SELECT * FROM player WHERE isActive = 0
+    Player.filter(Column("isActive") == false)
+
+    // GRDB 4 & 5: SELECT * FROM player WHERE isActive
+    Player.filter(Column("isActive"))
+
+    // GRDB 4 & 5: SELECT * FROM player WHERE NOT isActive
+    Player.filter(!Column("isActive"))
+    ```
+    
+    This change is innocuous for database boolean values that are `0`, `1`, or `NULL`. However, it is a breaking change for all other database values.
+
 
 [ValueObservation]: ../README.md#valueobservation
 [DatabaseRegionObservation]: ../README.md#databaseregionobservation
@@ -470,3 +524,4 @@ let publisher = observation
 [SQLRequest]: ../README.md#custom-requests
 [QueryInterfaceRequest]: ../README.md#requests
 [Combine publishers]: Combine.md
+[Database Observation]: ../README.md#database-changes-observation

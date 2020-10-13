@@ -1,9 +1,14 @@
 import Foundation
 
+/// An SQLite result code.
+///
+/// See https://www.sqlite.org/rescode.html
 public struct ResultCode: RawRepresentable, Equatable, CustomStringConvertible {
-    public let rawValue: Int32
+    /// The raw SQLite result code
+    public let rawValue: CInt
     
-    public init(rawValue: Int32) {
+    /// Creates a `ResultCode` from a raw SQLite result code.
+    public init(rawValue: CInt) {
         self.rawValue = rawValue
     }
     
@@ -239,11 +244,11 @@ public struct DatabaseError: Error, CustomStringConvertible, CustomNSError {
         self.arguments = arguments
     }
     
-    /// Creates a Database Error with a raw Int32 result code.
+    /// Creates a Database Error with a raw CInt result code.
     ///
     /// This initializer is not public because library user is not supposed to
     /// be exposed to raw result codes.
-    init(resultCode: Int32, message: String? = nil, sql: String? = nil, arguments: StatementArguments? = nil) {
+    init(resultCode: CInt, message: String? = nil, sql: String? = nil, arguments: StatementArguments? = nil) {
         self.init(resultCode: ResultCode(rawValue: resultCode), message: message, sql: sql, arguments: arguments)
     }
 }
@@ -351,7 +356,6 @@ extension DatabaseError {
 }
 
 extension DatabaseError {
-    // TODO: test
     /// Returns true if the error has code `SQLITE_ABORT` or `SQLITE_INTERRUPT`.
     ///
     /// Such an error can be thrown when a database has been interrupted, or
@@ -374,14 +378,14 @@ extension DatabaseError {
     /// :nodoc:
     public var description: String {
         var description = "SQLite error \(resultCode.rawValue)"
-        if let sql = sql {
-            description += " with statement `\(sql)`"
-        }
-        if let arguments = arguments, !arguments.isEmpty {
-            description += " arguments \(arguments)"
-        }
         if let message = message {
             description += ": \(message)"
+        }
+        if let sql = sql {
+            description += " - while executing `\(sql)`"
+        }
+        if let arguments = arguments, !arguments.isEmpty {
+            description += " with arguments \(arguments)"
         }
         return description
     }

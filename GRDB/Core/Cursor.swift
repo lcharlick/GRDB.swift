@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// MARK: - Array, Sequence, Set extensions
+// MARK: - Array, Sequence, Dictionary, Set extensions
 
 extension Array {
     /// Creates an array containing the elements of a cursor.
@@ -21,6 +21,20 @@ extension Array {
         self.init()
         while let element = try cursor.next() {
             append(element)
+        }
+    }
+}
+
+extension Dictionary {
+    /// Creates a new dictionary whose keys are the groupings returned by the
+    /// given closure and whose values are arrays of the elements that returned
+    /// each key.
+    public init<C: Cursor>(grouping values: C, by keyForValue: (C.Element) throws -> Key)
+    throws where Value == [C.Element]
+    {
+        self.init()
+        while let value = try values.next() {
+            try self[keyForValue(value), default: []].append(value)
         }
     }
 }
@@ -541,9 +555,6 @@ public final class AnyCursor<Element>: Cursor {
         element = body
     }
     
-    /// Advances to the next element and returns it, or nil if no next
-    /// element exists.
-    /// :nodoc:
     public func next() throws -> Element? {
         try element()
     }
@@ -625,9 +636,6 @@ public final class EnumeratedCursor<Base: Cursor>: Cursor {
         self.index = 0
     }
     
-    /// Advances to the next element and returns it, or nil if no next
-    /// element exists.
-    /// :nodoc:
     public func next() throws -> (Int, Base.Element)? {
         guard let element = try base.next() else { return nil }
         defer { index += 1 }
@@ -648,9 +656,6 @@ public final class FilterCursor<Base: Cursor>: Cursor {
         self.isIncluded = isIncluded
     }
     
-    /// Advances to the next element and returns it, or nil if no next
-    /// element exists.
-    /// :nodoc:
     public func next() throws -> Base.Element? {
         while let element = try base.next() {
             if try isIncluded(element) {
@@ -675,9 +680,6 @@ public final class FlattenCursor<Base: Cursor>: Cursor where Base.Element: Curso
         self.base = base
     }
     
-    /// Advances to the next element and returns it, or nil if no next
-    /// element exists.
-    /// :nodoc:
     public func next() throws -> Base.Element.Element? {
         while true {
             if let element = try inner?.next() {
@@ -706,9 +708,6 @@ public final class MapCursor<Base: Cursor, Element>: Cursor {
         self.transform = transform
     }
     
-    /// Advances to the next element and returns it, or nil if no next
-    /// element exists.
-    /// :nodoc:
     public func next() throws -> Element? {
         guard let element = try base.next() else { return nil }
         return try transform(element)

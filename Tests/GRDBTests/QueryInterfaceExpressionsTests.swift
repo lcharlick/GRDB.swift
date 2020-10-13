@@ -1,5 +1,5 @@
 import XCTest
-import GRDB
+@testable import GRDB
 
 private struct Col {
     static let id = Column("id")
@@ -15,21 +15,24 @@ private let tableRequest = Reader.all()
 
 class QueryInterfaceExpressionsTests: GRDBTestCase {
     
-    var collation: DatabaseCollation!
-    var customFunction: DatabaseFunction!
+    let collation = DatabaseCollation("localized_case_insensitive") { (lhs, rhs) in
+        return (lhs as NSString).localizedCaseInsensitiveCompare(rhs)
+    }
+    
+    let customFunction = DatabaseFunction("avgOf", pure: true) { dbValues in
+        let sum = dbValues.compactMap { Int.fromDatabaseValue($0) }.reduce(0, +)
+        return Double(sum) / Double(dbValues.count)
+    }
+    
+    override func setUp() {
+        super.setUp()
+        dbConfiguration.prepareDatabase { db in
+            db.add(collation: self.collation)
+            db.add(function: self.customFunction)
+        }
+    }
     
     override func setup(_ dbWriter: DatabaseWriter) throws {
-        collation = DatabaseCollation("localized_case_insensitive") { (lhs, rhs) in
-            return (lhs as NSString).localizedCaseInsensitiveCompare(rhs)
-        }
-        dbWriter.add(collation: collation)
-        
-        customFunction = DatabaseFunction("avgOf", pure: true) { dbValues in
-            let sum = dbValues.compactMap { Int.fromDatabaseValue($0) }.reduce(0, +)
-            return Double(sum) / Double(dbValues.count)
-        }
-        dbWriter.add(function: self.customFunction)
-        
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createReaders") { db in
             try db.execute(sql: """
@@ -463,16 +466,16 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
         
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.age == true)),
-            "SELECT * FROM \"readers\" WHERE \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" = 1")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(true == Col.age)),
-            "SELECT * FROM \"readers\" WHERE \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" = 1")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.age == false)),
-            "SELECT * FROM \"readers\" WHERE NOT \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" = 0")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(false == Col.age)),
-            "SELECT * FROM \"readers\" WHERE NOT \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" = 0")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(true == true)),
             "SELECT * FROM \"readers\" WHERE 1")
@@ -585,6 +588,25 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
             "SELECT * FROM \"readers\" WHERE \"age\" <> \"age\"")
         
         XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == 10))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 10")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == (10 as Int?)))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 10")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(10 == Col.age))),
+            "SELECT * FROM \"readers\" WHERE 10 <> \"age\"")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!((10 as Int?) == Col.age))),
+            "SELECT * FROM \"readers\" WHERE 10 <> \"age\"")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(10 == 10))),
+            "SELECT * FROM \"readers\" WHERE 0")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == Col.age))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> \"age\"")
+
+        XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.age != nil)),
             "SELECT * FROM \"readers\" WHERE \"age\" IS NOT NULL")
         XCTAssertEqual(
@@ -601,6 +623,22 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
             "SELECT * FROM \"readers\" WHERE \"age\" <> \"age\"")
         
         XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == nil))),
+            "SELECT * FROM \"readers\" WHERE \"age\" IS NOT NULL")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == DatabaseValue.null))),
+            "SELECT * FROM \"readers\" WHERE \"age\" IS NOT NULL")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(nil == Col.age))),
+            "SELECT * FROM \"readers\" WHERE \"age\" IS NOT NULL")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(DatabaseValue.null == Col.age))),
+            "SELECT * FROM \"readers\" WHERE \"age\" IS NOT NULL")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == Col.age))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> \"age\"")
+
+        XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.name != "B")),
             "SELECT * FROM \"readers\" WHERE \"name\" <> 'B'")
         XCTAssertEqual(
@@ -614,17 +652,30 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
             "SELECT * FROM \"readers\" WHERE \"name\" <> \"name\"")
         
         XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.name == "B"))),
+            "SELECT * FROM \"readers\" WHERE \"name\" <> 'B'")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!("B" == Col.name))),
+            "SELECT * FROM \"readers\" WHERE 'B' <> \"name\"")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!("B" == "B"))),
+            "SELECT * FROM \"readers\" WHERE 0")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.name == Col.name))),
+            "SELECT * FROM \"readers\" WHERE \"name\" <> \"name\"")
+        
+        XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.age != true)),
-            "SELECT * FROM \"readers\" WHERE NOT \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 1")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(true != Col.age)),
-            "SELECT * FROM \"readers\" WHERE NOT \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 1")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.age != false)),
-            "SELECT * FROM \"readers\" WHERE \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 0")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(false != Col.age)),
-            "SELECT * FROM \"readers\" WHERE \"age\"")
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 0")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(true != true)),
             "SELECT * FROM \"readers\" WHERE 0")
@@ -633,6 +684,28 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
             "SELECT * FROM \"readers\" WHERE 0")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(true != false)),
+            "SELECT * FROM \"readers\" WHERE 1")
+        
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == true))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 1")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(true == Col.age))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 1")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(Col.age == false))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 0")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(false == Col.age))),
+            "SELECT * FROM \"readers\" WHERE \"age\" <> 0")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(true == true))),
+            "SELECT * FROM \"readers\" WHERE 0")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(false == false))),
+            "SELECT * FROM \"readers\" WHERE 0")
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(true == false))),
             "SELECT * FROM \"readers\" WHERE 1")
     }
     
@@ -809,6 +882,10 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(!Col.age)),
             "SELECT * FROM \"readers\" WHERE NOT \"age\"")
+        // Make sure NOT NOT "hack" is available in order to produce 0 or 1
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!(!Col.age))),
+            "SELECT * FROM \"readers\" WHERE NOT (NOT \"age\")")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.age && true)),
             "SELECT * FROM \"readers\" WHERE \"age\" AND 1")
@@ -1213,6 +1290,18 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.filter(Col.name.like("%foo"))),
             "SELECT * FROM \"readers\" WHERE \"name\" LIKE '%foo'")
+        
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(!Col.name.like("%foo"))),
+            "SELECT * FROM \"readers\" WHERE \"name\" NOT LIKE '%foo'")
+        
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(Col.name.like("%foo") == true)),
+            "SELECT * FROM \"readers\" WHERE (\"name\" LIKE '%foo') = 1")
+        
+        XCTAssertEqual(
+            sql(dbQueue, tableRequest.filter(Col.name.like("%foo") == false)),
+            "SELECT * FROM \"readers\" WHERE (\"name\" LIKE '%foo') = 0")
     }
     
     
@@ -1259,5 +1348,42 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.select(customFunction(Col.age, 1, 2))),
             "SELECT avgOf(\"age\", 1, 2) FROM \"readers\"")
+    }
+    
+    // MARK: - _SQLExpressionFastPrimaryKey
+    
+    func testFastPrimaryKeyExpression() throws {
+        struct IntegerPrimaryKeyRecord: TableRecord { }
+        struct UUIDRecord: TableRecord { }
+        struct UUIDRecordWithoutRowID: TableRecord { }
+        struct RowIDRecord: TableRecord { }
+        struct CompoundPrimaryKeyRecord: TableRecord { }
+        
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.write { db in
+            try db.execute(sql: """
+                CREATE TABLE integerPrimaryKeyRecord (id INTEGER PRIMARY KEY);
+                CREATE TABLE uuidRecord (uuid TEXT PRIMARY KEY);
+                CREATE TABLE uuidRecordWithoutRowID (uuid TEXT PRIMARY KEY) WITHOUT ROWID;
+                CREATE TABLE rowIDRecord (name TEXT);
+                CREATE TABLE compoundPrimaryKeyRecord (a INTEGER, b INTEGER, PRIMARY KEY (a, b));
+                """)
+            
+            try assertEqualSQL(db, IntegerPrimaryKeyRecord.select(_SQLExpressionFastPrimaryKey()), """
+                SELECT "id" FROM "integerPrimaryKeyRecord"
+                """)
+            try assertEqualSQL(db, UUIDRecord.select(_SQLExpressionFastPrimaryKey()), """
+                SELECT "rowid" FROM "uuidRecord"
+                """)
+            try assertEqualSQL(db, UUIDRecordWithoutRowID.select(_SQLExpressionFastPrimaryKey()), """
+                SELECT "uuid" FROM "uuidRecordWithoutRowID"
+                """)
+            try assertEqualSQL(db, RowIDRecord.select(_SQLExpressionFastPrimaryKey()), """
+                SELECT "rowid" FROM "rowIDRecord"
+                """)
+            try assertEqualSQL(db, CompoundPrimaryKeyRecord.select(_SQLExpressionFastPrimaryKey()), """
+                SELECT "rowid" FROM "compoundPrimaryKeyRecord"
+                """)
+        }
     }
 }

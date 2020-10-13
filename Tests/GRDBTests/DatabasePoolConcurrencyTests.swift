@@ -236,7 +236,7 @@ class DatabasePoolConcurrencyTests: GRDBTestCase {
                 XCTAssertEqual(error.resultCode, .SQLITE_ERROR)
                 XCTAssertEqual(error.message!, "cannot start a transaction within a transaction")
                 XCTAssertEqual(error.sql!, "BEGIN DEFERRED TRANSACTION")
-                XCTAssertEqual(error.description, "SQLite error 1 with statement `BEGIN DEFERRED TRANSACTION`: cannot start a transaction within a transaction")
+                XCTAssertEqual(error.description, "SQLite error 1: cannot start a transaction within a transaction - while executing `BEGIN DEFERRED TRANSACTION`")
             }
         }
     }
@@ -261,7 +261,7 @@ class DatabasePoolConcurrencyTests: GRDBTestCase {
                 XCTAssertEqual(error.resultCode, .SQLITE_ERROR)
                 XCTAssertEqual(error.message!, "cannot start a transaction within a transaction")
                 XCTAssertEqual(error.sql!, "BEGIN DEFERRED TRANSACTION")
-                XCTAssertEqual(error.description, "SQLite error 1 with statement `BEGIN DEFERRED TRANSACTION`: cannot start a transaction within a transaction")
+                XCTAssertEqual(error.description, "SQLite error 1: cannot start a transaction within a transaction - while executing `BEGIN DEFERRED TRANSACTION`")
             }
         }
     }
@@ -480,10 +480,13 @@ class DatabasePoolConcurrencyTests: GRDBTestCase {
             try! dbPool.read { db in
                 s1.signal()
                 _ = s2.wait(timeout: .distantFuture)
-                XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM items")!, 1)  // Not a bug. The writer did not start a transaction.
+                // We read 0 due to snaphot isolation: the reader has checked
+                // the schema version before `s1` could let the writer insert
+                // an item.
+                XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM items")!, 0)
                 s3.signal()
                 _ = s4.wait(timeout: .distantFuture)
-                XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM items")!, 1)
+                XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM items")!, 0)
             }
         }
         let block2 = { () in
@@ -988,7 +991,7 @@ class DatabasePoolConcurrencyTests: GRDBTestCase {
             try! test(targetQueue: .main)
             expectation.fulfill()
         }
-        waitForExpectations(timeout: 1, handler: nil)
+        waitForExpectations(timeout: 2, handler: nil)
     }
     
     func testQoS() throws {

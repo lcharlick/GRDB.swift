@@ -5,13 +5,13 @@ import GRDB
 ///
 /// It applies the pratices recommended at
 /// https://github.com/groue/GRDB.swift/blob/master/Documentation/GoodPracticesForDesigningRecordTypes.md
-final class AppDatabase {
-    private let dbQueue: DatabaseQueue
+struct AppDatabase {
+    private let dbWriter: DatabaseWriter
     
     /// Creates an AppDatabase and make sure the database schema is ready.
-    init(_ dbQueue: DatabaseQueue) throws {
-        self.dbQueue = dbQueue
-        try migrator.migrate(dbQueue)
+    init(_ dbWriter: DatabaseWriter) throws {
+        self.dbWriter = dbWriter
+        try migrator.migrate(dbWriter)
     }
     
     /// The DatabaseMigrator that defines the database schema.
@@ -57,28 +57,28 @@ extension AppDatabase {
     
     /// Save (insert or update) a player.
     func savePlayer(_ player: inout Player) throws {
-        try dbQueue.write { db in
+        try dbWriter.write { db in
             try player.save(db)
         }
     }
     
     /// Delete the specified players
     func deletePlayers(ids: [Int64]) throws {
-        try dbQueue.write { db in
+        try dbWriter.write { db in
             _ = try Player.deleteAll(db, keys: ids)
         }
     }
     
     /// Delete all players
     func deleteAllPlayers() throws {
-        try dbQueue.write { db in
+        try dbWriter.write { db in
             _ = try Player.deleteAll(db)
         }
     }
     
     /// Refresh all players (by performing some random changes, for demo purpose).
     func refreshPlayers() throws {
-        try dbQueue.write { db in
+        try dbWriter.write { db in
             if try Player.fetchCount(db) == 0 {
                 // Insert new random players
                 try createRandomPlayers(db)
@@ -104,7 +104,7 @@ extension AppDatabase {
     
     /// Create random players if the database is empty.
     func createRandomPlayersIfEmpty() throws {
-        try dbQueue.write { db in
+        try dbWriter.write { db in
             if try Player.fetchCount(db) == 0 {
                 try createRandomPlayers(db)
             }
@@ -125,9 +125,7 @@ extension AppDatabase {
     func playersOrderedByNamePublisher() -> AnyPublisher<[Player], Error> {
         ValueObservation
             .tracking(Player.all().orderedByName().fetchAll)
-            // Use the .immediate scheduling so that views do not have to wait
-            // until the players are loaded.
-            .publisher(in: dbQueue, scheduling: .immediate)
+            .publisher(in: dbWriter)
             .eraseToAnyPublisher()
     }
     
@@ -135,29 +133,7 @@ extension AppDatabase {
     func playersOrderedByScorePublisher() -> AnyPublisher<[Player], Error> {
         ValueObservation
             .tracking(Player.all().orderedByScore().fetchAll)
-            // Use the .immediate scheduling so that views do not have to wait
-            // until the players are loaded.
-            .publisher(in: dbQueue, scheduling: .immediate)
+            .publisher(in: dbWriter)
             .eraseToAnyPublisher()
     }
 }
-
-// MARK: - Support for Tests and Previews
-
-#if DEBUG
-extension AppDatabase {
-    /// Returns an empty, in-memory database, suitable for testing and previews.
-    static func empty() throws -> AppDatabase {
-        try AppDatabase(DatabaseQueue())
-    }
-    
-    /// Returns an in-memory database populated with a few random
-    /// players, suitable for previews.
-    static func random() throws -> AppDatabase {
-        let database = try AppDatabase.empty()
-        try database.createRandomPlayersIfEmpty()
-        return database
-    }
-}
-#endif
-

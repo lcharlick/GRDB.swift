@@ -14,12 +14,13 @@ public class DatabaseSnapshot: DatabaseReader {
         serializedDatabase.configuration
     }
     
-    /// Not nil iff SQLite was compiled with `SQLITE_ENABLE_SNAPSHOT`.
+    #if SQLITE_ENABLE_SNAPSHOT
+    // Support for ValueObservation in DatabasePool
     private(set) var version: UnsafeMutablePointer<sqlite3_snapshot>?
+    #endif
     
     init(path: String, configuration: Configuration = Configuration(), defaultLabel: String, purpose: String) throws {
-        var configuration = configuration
-        configuration.readonly = true
+        var configuration = DatabasePool.readerConfiguration(configuration)
         configuration.allowsUnsafeTransactions = true // Snaphost keeps a long-lived transaction
         
         serializedDatabase = try SerializedDatabase(
@@ -35,17 +36,29 @@ public class DatabaseSnapshot: DatabaseReader {
             guard journalMode == "wal" else {
                 throw DatabaseError(message: "WAL mode is not activated at path: \(path)")
             }
-            try db.beginSnapshotTransaction()
+            
+            // Open transaction
+            try db.beginTransaction(.deferred)
+            
+            // Acquire snapshot isolation
+            try db.internalCachedSelectStatement(sql: "SELECT rootpage FROM sqlite_master LIMIT 1").makeCursor().next()
+            
+            #if SQLITE_ENABLE_SNAPSHOT
+            // We must expect an error: https://www.sqlite.org/c3ref/snapshot_get.html
+            // > At least one transaction must be written to it first.
             version = try? db.takeVersionSnapshot()
+            #endif
         }
     }
     
     deinit {
         // Leave snapshot isolation
         serializedDatabase.reentrantSync { db in
+            #if SQLITE_ENABLE_SNAPSHOT
             if let version = version {
-                grdb_snapshot_free(version)
+                sqlite3_snapshot_free(version)
             }
+            #endif
             try? db.commit()
         }
     }
@@ -106,30 +119,10 @@ extension DatabaseSnapshot {
         try serializedDatabase.reentrantSync(block)
     }
     
-    // MARK: - Functions
-    
-    public func add(function: DatabaseFunction) {
-        serializedDatabase.sync { $0.add(function: function) }
-    }
-    
-    public func remove(function: DatabaseFunction) {
-        serializedDatabase.sync { $0.remove(function: function) }
-    }
-    
-    // MARK: - Collations
-    
-    public func add(collation: DatabaseCollation) {
-        serializedDatabase.sync { $0.add(collation: collation) }
-    }
-    
-    public func remove(collation: DatabaseCollation) {
-        serializedDatabase.sync { $0.remove(collation: collation) }
-    }
-    
     // MARK: - Database Observation
     
     /// :nodoc:
-    public func _add<Reducer: _ValueReducer>(
+    public func _add<Reducer: ValueReducer>(
         observation: ValueObservation<Reducer>,
         scheduling scheduler: ValueObservationScheduler,
         onChange: @escaping (Reducer.Value) -> Void)

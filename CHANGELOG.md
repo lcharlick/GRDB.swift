@@ -5,13 +5,12 @@ All notable changes to this project will be documented in this file.
 
 GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: APIs flagged [**:fire: EXPERIMENTAL**](README.md#what-are-experimental-features). Those are unstable, and may break between any two minor releases of the library.
 
-<!--
-[Next Release](#next-release)
--->
-
 #### 5.x Releases
 
-- `5.0.0` Betas - [5.0.0-beta](#500-beta) | [5.0.0-beta.2](#500-beta2) | [5.0.0-beta.3](#500-beta3) | [5.0.0-beta.4](#500-beta4) | [5.0.0-beta.5](#500-beta5) | [5.0.0-beta.6](#500-beta6)
+<!-- - [Next Release](#next-release) -->
+
+- `5.0.x` Releases - [5.0.0](#500) | [5.0.1](#501) | [5.0.2](#502)
+- `5.0.0` Betas - [5.0.0-beta](#500-beta) | [5.0.0-beta.2](#500-beta2) | [5.0.0-beta.3](#500-beta3) | [5.0.0-beta.4](#500-beta4) | [5.0.0-beta.5](#500-beta5) | [5.0.0-beta.6](#500-beta6) | [5.0.0-beta.7](#500-beta7) | [5.0.0-beta.8](#500-beta8) | [5.0.0-beta.9](#500-beta9) | [5.0.0-beta.10](#500-beta10) | [5.0.0-beta.11](#500-beta11)
 
 
 #### 4.x Releases
@@ -70,9 +69,73 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 - [0.110.0](#01100), ...
 
 
-<!--
-## Next Release
--->
+## 5.0.2
+
+Released October 6, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.1...v5.0.2)
+
+- **Fixed**: [#844](https://github.com/groue/GRDB.swift/issues/844): Fix a crash in the demo app
+- **Fixed**: [#847](https://github.com/groue/GRDB.swift/issues/847): Remove dependency on SQLITE_ENABLE_SNAPSHOT
+
+
+## 5.0.1
+
+Released September 27, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0...v5.0.1)
+
+- **Fixed**: [#841](https://github.com/groue/GRDB.swift/issues/841): Fix GRDB 5 regression with indexes on expressions
+- The [GRDBCombineDemo](Documentation/DemoApps/GRDBCombineDemo/README.md) Combine + SwiftUI demo application was updated for the SwiftUI App lifecycle introduced in iOS 14.
+
+
+## 5.0.0
+
+Released September 20, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0-beta.11...v5.0.0)
+
+- **Fixed**: [#838](https://github.com/groue/GRDB.swift/issues/838): Have indexed colums inherit the `ifNotExists` flag from table creation.
+
+
+## 5.0.0-beta.11
+
+Released September 7, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0-beta.10...v5.0.0-beta.11)
+
+- **Breaking Change**: [#831](https://github.com/groue/GRDB.swift/pull/831): Improve Configuration.prepareDatabase
+
+
+## 5.0.0-beta.10
+
+Released July 30, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0-beta.9...v5.0.0-beta.10)
+
+- **New**: DatabasePool readers don't invalidate their database schema cache until schema is actually changed.
+- **Breaking Change**: [#817](https://github.com/groue/GRDB.swift/pull/817): Allow query planner to optimize some boolean tests
+
+
+## 5.0.0-beta.9
+
+Released July 23, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0-beta.8...v5.0.0-beta.9)
+
+- **New**: [#813](https://github.com/groue/GRDB.swift/pull/813): Expose SQLite 3.31.1 APIs to iOS, macOS, tvOS, watchOS
+- **Fixed**: [#814](https://github.com/groue/GRDB.swift/pull/814): Fix regression with views
+
+
+## 5.0.0-beta.8
+
+Released July 19, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0-beta.7...v5.0.0-beta.8)
+
+- **New**: [#811](https://github.com/groue/GRDB.swift/pull/811): Introduce RenameColumnAdapter
+
+
+## 5.0.0-beta.7
+
+Released July 14, 2020 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v5.0.0-beta.6...v5.0.0-beta.7)
+
+- **New**: [#802](https://github.com/groue/GRDB.swift/pull/802) by [@GetToSet](https://github.com/GetToSet): Add tokenchars support for ascii tokenizer in FTS5
+- **New**: `fetchSet` has joined `fetchCursor`, `fetchAll` and `fetchOne` in the group of universal fetching methods.
+- **Breaking Change**: [#803](https://github.com/groue/GRDB.swift/pull/803): Remove FetchedRecordsController
+- **Breaking Change**: Removed `TableRecord.primaryKey` and `selectPrimaryKey(as:)` introduced in 5.0.0-beta.5
+- **Breaking Change**: Many types and methods that support the query builder used to be publicly exposed and flagged as experimental. They are now private, or renamed with an underscore prefix, which means they are not for public use.
+- **Breaking Change**: Defining custom `FetchRequest` types is no longer supported.
+- **Breaking Change**: Defining custom `RowAdapter` types is no longer supported.
+- **Fixed**: Fix rare occurences of an `SQLITE_BUSY` error when opening a DatabaseSnapshot.
+- **Fixed**: Work around an SQLite bug which prevents rollbacking a transaction with `sqlite3_commit_hook`.
+- The [How do I filter records and only keep those that are NOT associated to another record?](README.md#how-do-i-filter-records-and-only-keep-those-that-are-not-associated-to-another-record) FAQ has been updated.
 
 
 ## 5.0.0-beta.6

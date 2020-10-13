@@ -15,14 +15,18 @@ private let tableRequest = Reader.all()
 
 class QueryInterfaceRequestTests: GRDBTestCase {
     
-    var collation: DatabaseCollation!
+    let collation = DatabaseCollation("localized_case_insensitive") { (lhs, rhs) in
+        return (lhs as NSString).localizedCaseInsensitiveCompare(rhs)
+    }
+    
+    override func setUp() {
+        super.setUp()
+        dbConfiguration.prepareDatabase { db in
+            db.add(collation: self.collation)
+        }
+    }
     
     override func setup(_ dbWriter: DatabaseWriter) throws {
-        collation = DatabaseCollation("localized_case_insensitive") { (lhs, rhs) in
-            return (lhs as NSString).localizedCaseInsensitiveCompare(rhs)
-        }
-        dbWriter.add(collation: collation)
-        
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createReaders") { db in
             try db.execute(sql: """
@@ -617,6 +621,21 @@ class QueryInterfaceRequestTests: GRDBTestCase {
             "SELECT * FROM \"readers\" WHERE 1 AND 0")
     }
     
+    // Regression test for https://github.com/groue/GRDB.swift/issues/812
+    func testFilterOnView() throws {
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.write { db in
+            try db.execute(sql: "CREATE VIEW v AS SELECT * FROM readers")
+            struct ViewRecord: TableRecord, FetchableRecord, Decodable {
+                static let databaseTableName = "v"
+            }
+            _ = try ViewRecord.filter(Column("id") == 1).fetchOne(db)
+            XCTAssertEqual(
+                lastSQLQuery,
+                "SELECT * FROM \"v\" WHERE \"id\" = 1 LIMIT 1")
+        }
+    }
+    
     
     // MARK: - Group
     
@@ -744,6 +763,15 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.order(Col.age.descNullsFirst)),
             "SELECT * FROM \"readers\" ORDER BY \"age\" DESC NULLS FIRST")
+        #elseif !GRDBCIPHER
+        if #available(OSX 10.16, iOS 14, tvOS 14, watchOS 7, *) {
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.age.ascNullsLast)),
+                "SELECT * FROM \"readers\" ORDER BY \"age\" ASC NULLS LAST")
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.age.descNullsFirst)),
+                "SELECT * FROM \"readers\" ORDER BY \"age\" DESC NULLS FIRST")
+        }
         #endif
     }
     
@@ -765,6 +793,15 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).descNullsFirst)),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE DESC NULLS FIRST")
+        #elseif !GRDBCIPHER
+        if #available(OSX 10.16, iOS 14, tvOS 14, watchOS 7, *) {
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).ascNullsLast)),
+                "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE ASC NULLS LAST")
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).descNullsFirst)),
+                "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE DESC NULLS FIRST")
+        }
         #endif
     }
     
@@ -805,6 +842,15 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.order(Col.age.ascNullsLast).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"age\" DESC NULLS FIRST")
+        #elseif !GRDBCIPHER
+        if #available(OSX 10.16, iOS 14, tvOS 14, watchOS 7, *) {
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.age.descNullsFirst).reversed()),
+                "SELECT * FROM \"readers\" ORDER BY \"age\" ASC NULLS LAST")
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.age.ascNullsLast).reversed()),
+                "SELECT * FROM \"readers\" ORDER BY \"age\" DESC NULLS FIRST")
+        }
         #endif
     }
     
@@ -826,6 +872,15 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).descNullsFirst).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE ASC NULLS LAST")
+        #elseif !GRDBCIPHER
+        if #available(OSX 10.16, iOS 14, tvOS 14, watchOS 7, *) {
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).ascNullsLast).reversed()),
+                "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE DESC NULLS FIRST")
+            XCTAssertEqual(
+                sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).descNullsFirst).reversed()),
+                "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE ASC NULLS LAST")
+        }
         #endif
     }
     
@@ -857,5 +912,70 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.limit(1, offset: 2).limit(3)),
             "SELECT * FROM \"readers\" LIMIT 3")
+    }
+    
+    // MARK: - FetchOne Optimization
+    
+    func testFetchOneLimitOptimization() throws {
+        // Test that we avoid emitting "LIMIT 1" when possible
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.read { db in
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(key: 1))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE \"id\" = 1")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") == 1))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE \"id\" = 1")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") == nil))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE \"id\" IS NULL")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("name") == "Arthur"))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE \"name\" = \'Arthur\' LIMIT 1")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") == 1 && Column("name") == "Arthur"))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE (\"id\" = 1) AND (\"name\" = \'Arthur\')")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") == 1).filter(Column("name") == "Arthur"))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE (\"id\" = 1) AND (\"name\" = \'Arthur\')")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id")))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE \"id\" LIMIT 1")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") != 1))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE \"id\" <> 1 LIMIT 1")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") == 1 && Column("id") == 2))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE (\"id\" = 1) AND (\"id\" = 2)")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.filter(Column("id") == 1 || Column("id") == 2))
+                XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\" WHERE (\"id\" = 1) OR (\"id\" = 2) LIMIT 1")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.select(max(Column("id"))))
+                XCTAssertEqual(lastSQLQuery, "SELECT MAX(\"id\") FROM \"readers\"")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.select(min(Column("age")).forKey("minAge"), max(Column("age")).forKey("maxAge")))
+                XCTAssertEqual(lastSQLQuery, "SELECT MIN(\"age\") AS \"minAge\", MAX(\"age\") AS \"maxAge\" FROM \"readers\"")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.select(max(Column("age") + 1)))
+                XCTAssertEqual(lastSQLQuery, "SELECT MAX(\"age\" + 1) FROM \"readers\"")
+            }
+            do {
+                _ = try Row.fetchOne(db, tableRequest.select(max(Column("age")) + 1))
+                XCTAssertEqual(lastSQLQuery, "SELECT MAX(\"age\") + 1 FROM \"readers\"")
+            }
+        }
     }
 }

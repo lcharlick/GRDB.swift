@@ -149,7 +149,7 @@ extension Database {
     ///
     /// - throws: A DatabaseError whenever an SQLite error occurs.
     public func reindex(collation: DatabaseCollation) throws {
-        try reindex(collation: Database.CollationName(collation.name))
+        try reindex(collation: Database.CollationName(rawValue: collation.name))
     }
 }
 
@@ -471,7 +471,7 @@ public final class TableDefinition {
         }
         
         let indexStatements = try columns
-            .compactMap { $0.indexDefinition(in: name) }
+            .compactMap { $0.indexDefinition(in: name, ifNotExists: ifNotExists) }
             .map { try $0.sql(db) }
         statements.append(contentsOf: indexStatements)
         return statements.joined(separator: "; ")
@@ -521,7 +521,7 @@ public final class TableAlteration {
         return column
     }
     
-    #if GRDBCUSTOMSQLITE || GRDBCipher
+    #if GRDBCUSTOMSQLITE || GRDBCIPHER
     /// Renames a column in a table.
     ///
     ///     try db.alter(table: "player") { t in
@@ -570,7 +570,7 @@ public final class TableAlteration {
                 let statement = chunks.joined(separator: " ")
                 statements.append(statement)
                 
-                if let indexDefinition = column.indexDefinition(in: name) {
+                if let indexDefinition = column.indexDefinition(in: name, ifNotExists: false) {
                     try statements.append(indexDefinition.sql(db))
                 }
             case let .rename(oldName, newName):
@@ -774,7 +774,7 @@ public final class ColumnDefinition {
         return self
     }
     
-    // Defines the default column collation.
+    /// Defines the default column collation.
     ///
     ///     try db.create(table: "player") { t in
     ///         t.column("email", .text).collate(.nocase)
@@ -790,7 +790,7 @@ public final class ColumnDefinition {
         return self
     }
     
-    // Defines the default column collation.
+    /// Defines the default column collation.
     ///
     ///     try db.create(table: "player") { t in
     ///         t.column("name", .text).collate(.localizedCaseInsensitiveCompare)
@@ -934,7 +934,7 @@ public final class ColumnDefinition {
         return chunks.joined(separator: " ")
     }
     
-    fileprivate func indexDefinition(in table: String) -> IndexDefinition? {
+    fileprivate func indexDefinition(in table: String, ifNotExists: Bool) -> IndexDefinition? {
         switch index {
         case .none: return nil
         case .unique: return nil
@@ -944,7 +944,7 @@ public final class ColumnDefinition {
                 table: table,
                 columns: [name],
                 unique: false,
-                ifNotExists: false,
+                ifNotExists: ifNotExists,
                 condition: nil)
         }
     }

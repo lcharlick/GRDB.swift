@@ -18,6 +18,16 @@ extension Database {
         publicStatementCache.clear()
     }
     
+    /// Clears the database schema cache if the database schema has changed
+    /// since this method was last called.
+    func clearSchemaCacheIfNeeded() throws {
+        let schemaVersion = try Int32.fetchOne(internalCachedSelectStatement(sql: "PRAGMA schema_version"))
+        if _lastSchemaVersion != schemaVersion {
+            _lastSchemaVersion = schemaVersion
+            clearSchemaCache()
+        }
+    }
+    
     /// Returns whether a table exists.
     public func tableExists(_ name: String) throws -> Bool {
         try exists(type: .table, name: name)
@@ -140,44 +150,75 @@ extension Database {
             if pkColumn.type.uppercased() == "INTEGER" {
                 primaryKey = .rowID(pkColumn.name)
             } else {
-                primaryKey = .regular([pkColumn.name])
+                primaryKey = try .regular([pkColumn.name], tableHasRowID: tableHasRowID(tableName))
             }
         default:
             // Multi-columns primary key
-            primaryKey = .regular(pkColumns.map(\.name))
+            primaryKey = try .regular(pkColumns.map(\.name), tableHasRowID: tableHasRowID(tableName))
         }
         
         schemaCache.set(primaryKey: primaryKey, forTable: tableName)
         return primaryKey
     }
     
-    /// The indexes on table named `tableName`; returns the empty array if the
-    /// table does not exist.
+    /// Returns whether the column identifies the rowid column
+    func columnIsRowID(_ column: String, of tableName: String) throws -> Bool {
+        let pk = try primaryKey(tableName)
+        return pk.rowIDColumn == column || (pk.tableHasRowID && column.uppercased() == "ROWID")
+    }
+    
+    /// Returns whether the table has a rowid column.
+    private func tableHasRowID(_ tableName: String) throws -> Bool {
+        // Not need to cache the result, because this information feeds
+        // `PrimaryKeyInfo`, which is cached.
+        do {
+            _ = try makeSelectStatement(sql: "SELECT rowid FROM \(tableName.quotedDatabaseIdentifier)")
+            return true
+        } catch DatabaseError.SQLITE_ERROR {
+            return false
+        }
+    }
+    
+    /// The indexes on table named `tableName`.
     ///
-    /// Note: SQLite does not define any index for INTEGER PRIMARY KEY columns:
-    /// this method does not return any index that represents this primary key.
+    /// Only indexes on columns are returned. Indexes on expressions are
+    /// not returned.
+    ///
+    /// SQLite does not define any index for INTEGER PRIMARY KEY columns: this
+    /// method does not return any index that represents the primary key.
     ///
     /// If you want to know if a set of columns uniquely identify a row, prefer
-    /// table(_:hasUniqueKey:) instead.
+    /// `table(_:hasUniqueKey:)` instead.
     public func indexes(on tableName: String) throws -> [IndexInfo] {
         if let indexes = schemaCache.indexes(on: tableName) {
             return indexes
         }
         
         let indexes = try Row
+            // [seq:0 name:"index" unique:0 origin:"c" partial:0]
             .fetchAll(self, sql: "PRAGMA index_list(\(tableName.quotedDatabaseIdentifier))")
-            .map { row -> IndexInfo in
-                // [seq:0 name:"index" unique:0 origin:"c" partial:0]
+            .compactMap { row -> IndexInfo? in
                 let indexName: String = row[1]
                 let unique: Bool = row[2]
-                let columns = try Row
+                
+                let indexInfoRows = try Row
+                    // [seqno:0 cid:2 name:"column"]
                     .fetchAll(self, sql: "PRAGMA index_info(\(indexName.quotedDatabaseIdentifier))")
-                    .map({ row -> (Int, String) in
-                        // [seqno:0 cid:2 name:"column"]
-                        (row[0] as Int, row[2] as String)
-                    })
-                    .sorted { $0.0 < $1.0 }
-                    .map { $0.1 }
+                    // Sort by rank
+                    .sorted(by: { ($0[0] as Int) < ($1[0] as Int) })
+                var columns: [String] = []
+                for indexInfoRow in indexInfoRows {
+                    guard let column = indexInfoRow[2] as String? else {
+                        // https://sqlite.org/pragma.html#pragma_index_info
+                        // > The name of the column being indexed is NULL if the
+                        // > column is the rowid or an expression.
+                        //
+                        // IndexInfo does not support expressing such index.
+                        // Maybe in a future GRDB version?
+                        return nil
+                    }
+                    columns.append(column)
+                }
                 return IndexInfo(name: indexName, columns: columns, unique: unique)
         }
         
@@ -521,7 +562,7 @@ public struct PrimaryKeyInfo {
         
         /// Any primary key, but INTEGER PRIMARY KEY.
         /// Associated strings are column names.
-        case regular([String])
+        case regular(columns: [String], tableHasRowID: Bool)
     }
     
     private let impl: Impl
@@ -530,9 +571,9 @@ public struct PrimaryKeyInfo {
         PrimaryKeyInfo(impl: .rowID(column))
     }
     
-    static func regular(_ columns: [String]) -> PrimaryKeyInfo {
+    static func regular(_ columns: [String], tableHasRowID: Bool) -> PrimaryKeyInfo {
         assert(!columns.isEmpty)
-        return PrimaryKeyInfo(impl: .regular(columns))
+        return PrimaryKeyInfo(impl: .regular(columns: columns, tableHasRowID: tableHasRowID))
     }
     
     static let hiddenRowID = PrimaryKeyInfo(impl: .hiddenRowID)
@@ -542,9 +583,9 @@ public struct PrimaryKeyInfo {
         switch impl {
         case .hiddenRowID:
             return [Column.rowID.name]
-        case .rowID(let column):
+        case let .rowID(column):
             return [column]
-        case .regular(let columns):
+        case let .regular(columns: columns, tableHasRowID: _):
             return columns
         }
     }
@@ -570,6 +611,18 @@ public struct PrimaryKeyInfo {
             return true
         case .regular:
             return false
+        }
+    }
+    
+    /// When false, the table is a WITHOUT ROWID table
+    var tableHasRowID: Bool {
+        switch impl {
+        case .hiddenRowID:
+            return true
+        case .rowID:
+            return true
+        case let .regular(columns: _, tableHasRowID: tableHasRowID):
+            return tableHasRowID
         }
     }
 }
