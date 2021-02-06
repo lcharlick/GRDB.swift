@@ -26,13 +26,13 @@ public protocol ColumnExpression: SQLExpression {
 
 extension ColumnExpression {
     /// :nodoc:
-    public func _expressionSQL(_ context: SQLGenerationContext, wrappedInParenthesis: Bool) throws -> String {
-        name.quotedDatabaseIdentifier
+    public func _qualifiedExpression(with alias: TableAlias) -> SQLExpression {
+        _SQLQualifiedColumn(name, alias: alias)
     }
     
     /// :nodoc:
-    public func _qualifiedExpression(with alias: TableAlias) -> SQLExpression {
-        SQLQualifiedColumn(name, alias: alias)
+    public func _accept<Visitor: _SQLExpressionVisitor>(_ visitor: inout Visitor) throws {
+        try visitor.visit(self)
     }
 }
 
@@ -42,7 +42,7 @@ extension ColumnExpression {
 /// Instead, adopt the ColumnExpression protocol.
 ///
 /// See https://github.com/groue/GRDB.swift#the-query-interface
-public struct Column: ColumnExpression, Equatable {
+public struct Column: ColumnExpression {
     /// The hidden rowID column
     public static let rowID = Column("rowid")
     
@@ -63,8 +63,8 @@ public struct Column: ColumnExpression, Equatable {
 /// A qualified column in the database, as in `SELECT t.a FROM t`
 /// 
 /// :nodoc:
-struct SQLQualifiedColumn: ColumnExpression {
-    var name: String
+public struct _SQLQualifiedColumn: ColumnExpression {
+    public var name: String
     let alias: TableAlias
     
     /// Creates a column given its name.
@@ -73,26 +73,15 @@ struct SQLQualifiedColumn: ColumnExpression {
         self.alias = alias
     }
     
-    func _column(_ db: Database, for alias: TableAlias, acceptsBijection: Bool) throws -> String? {
-        if alias == self.alias {
-            return name
-        } else {
-            return nil
-        }
-    }
-    
-    func _expressionSQL(_ context: SQLGenerationContext, wrappedInParenthesis: Bool) throws -> String {
-        if let qualifier = context.qualifier(for: alias) {
-            return qualifier.quotedDatabaseIdentifier
-                + "."
-                + name.quotedDatabaseIdentifier
-        }
-        return name.quotedDatabaseIdentifier
-    }
-    
-    func _qualifiedExpression(with alias: TableAlias) -> SQLExpression {
+    /// :nodoc:
+    public func _qualifiedExpression(with alias: TableAlias) -> SQLExpression {
         // Never requalify
         self
+    }
+    
+    /// :nodoc:
+    public func _accept<Visitor: _SQLExpressionVisitor>(_ visitor: inout Visitor) throws {
+        try visitor.visit(self)
     }
 }
 

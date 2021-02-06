@@ -4,7 +4,7 @@ import GRDB
 class ValueObservationFetchTests: GRDBTestCase {
     func testFetch() throws {
         try assertValueObservation(
-            ValueObservation.trackingConstantRegion {
+            ValueObservation.tracking {
                 try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM t")!
             },
             records: [0, 1, 1, 2],
@@ -21,7 +21,7 @@ class ValueObservationFetchTests: GRDBTestCase {
     func testRemoveDuplicated() throws {
         try assertValueObservation(
             ValueObservation
-                .trackingConstantRegion { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM t")! }
+                .tracking { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM t")! }
                 .removeDuplicates(),
             records: [0, 1, 2],
             setup: { db in

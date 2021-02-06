@@ -32,7 +32,7 @@ struct ReceiveValuesOn<Upstream: Publisher, Context: Scheduler>: Publisher {
 
 @available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
 private class ReceiveValuesOnSubscription<Upstream, Context, Downstream>: Subscription, Subscriber
-where
+    where
     Upstream: Publisher,
     Context: Scheduler,
     Downstream: Subscriber,
@@ -107,7 +107,7 @@ where
             }
         }
     }
-    
+
     // MARK: Subscriber
     
     func receive(subscription: Subscription) {
@@ -130,9 +130,9 @@ where
             switch state {
             case let .subscribed(target, _):
                 sideEffect = {
-                    target.context.schedule(options: target.options) {
-                        self._receive(input)
-                    }
+                target.context.schedule(options: target.options) {
+                    self._receive(input)
+                }
                 }
             case .waitingForRequest, .waitingForSubscription, .finished:
                 break
@@ -154,9 +154,9 @@ where
                 break
             case let .subscribed(target, _):
                 sideEffect = {
-                    target.context.schedule(options: target.options) {
-                        self._receive(completion: completion)
-                    }
+                target.context.schedule(options: target.options) {
+                    self._receive(completion: completion)
+                }
                 }
             case .finished:
                 break
@@ -172,7 +172,7 @@ where
             case let .subscribed(target, _):
                 // TODO: don't ignore demand
                 sideEffect = {
-                    _ = target.downstream.receive(input)
+                _ = target.downstream.receive(input)
                 }
             case .finished:
                 break

@@ -35,42 +35,24 @@ extension Database {
     
     /// Returns whether a table is an internal SQLite table.
     ///
-    /// Those are tables whose name begins with `sqlite_` and `pragma_`.
+    /// Those are tables whose name begins with "sqlite_".
     ///
     /// For more information, see https://www.sqlite.org/fileformat2.html
-    public static func isSQLiteInternalTable(_ tableName: String) -> Bool {
+    public func isSQLiteInternalTable(_ tableName: String) -> Bool {
         // https://www.sqlite.org/fileformat2.html#internal_schema_objects
         // > The names of internal schema objects always begin with "sqlite_"
         // > and any table, index, view, or trigger whose name begins with
         // > "sqlite_" is an internal schema object. SQLite prohibits
         // > applications from creating objects whose names begin with
         // > "sqlite_".
-        tableName.starts(with: "sqlite_") || tableName.starts(with: "pragma_")
-    }
-    
-    /// Returns whether a table is an internal SQLite table.
-    ///
-    /// Those are tables whose name begins with `sqlite_` and `pragma_`.
-    ///
-    /// For more information, see https://www.sqlite.org/fileformat2.html
-    @available(*, deprecated, message: "Use Database.isSQLiteInternalTable(_:) static method instead.")
-    public func isSQLiteInternalTable(_ tableName: String) -> Bool {
-        Self.isSQLiteInternalTable(tableName)
+        return tableName.starts(with: "sqlite_")
     }
     
     /// Returns whether a table is an internal GRDB table.
     ///
     /// Those are tables whose name begins with "grdb_".
-    public static func isGRDBInternalTable(_ tableName: String) -> Bool {
-        tableName.starts(with: "grdb_")
-    }
-    
-    /// Returns whether a table is an internal GRDB table.
-    ///
-    /// Those are tables whose name begins with "grdb_".
-    @available(*, deprecated, message: "Use Database.isGRDBInternalTable(_:) static method instead.")
     public func isGRDBInternalTable(_ tableName: String) -> Bool {
-        Self.isGRDBInternalTable(tableName)
+        tableName.starts(with: "grdb_")
     }
     
     /// Returns whether a view exists.
@@ -238,7 +220,7 @@ extension Database {
                     columns.append(column)
                 }
                 return IndexInfo(name: indexName, columns: columns, unique: unique)
-            }
+        }
         
         if indexes.isEmpty {
             // PRAGMA index_list doesn't throw any error when table does
@@ -257,8 +239,8 @@ extension Database {
     public func table<T: Sequence>(
         _ tableName: String,
         hasUniqueKey columns: T)
-    throws -> Bool
-    where T.Iterator.Element == String
+        throws -> Bool
+        where T.Iterator.Element == String
     {
         try columnsForUniqueKey(Array(columns), in: tableName) != nil
     }
@@ -286,8 +268,9 @@ extension Database {
                     .mapping
                     .append((origin: origin, destination: destination, seq: seq))
             } else {
-                let mapping = [(origin: origin, destination: destination, seq: seq)]
-                rawForeignKeys.append((destinationTable: table, mapping: mapping))
+                rawForeignKeys.append((
+                    destinationTable: table,
+                    mapping: [(origin: origin, destination: destination, seq: seq)]))
                 previousId = id
             }
         }
@@ -426,8 +409,8 @@ extension Database {
     func columnsForUniqueKey<T: Sequence>(
         _ columns: T,
         in tableName: String)
-    throws -> [String]?
-    where T.Iterator.Element == String
+        throws -> [String]?
+        where T.Iterator.Element == String
     {
         let lowercasedColumns = Set(columns.map { $0.lowercased() })
         if lowercasedColumns.isEmpty {

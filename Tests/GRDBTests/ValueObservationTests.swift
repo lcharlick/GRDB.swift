@@ -7,7 +7,7 @@ class ValueObservationTests: GRDBTestCase {
         func test(_ dbWriter: DatabaseWriter) throws {
             // Create an observation
             struct TestError: Error { }
-            let observation = ValueObservation.trackingConstantRegion { _ in throw TestError() }
+            let observation = ValueObservation.tracking { _ in throw TestError() }
             
             // Start observation
             var error: TestError?
@@ -36,7 +36,7 @@ class ValueObservationTests: GRDBTestCase {
             
             struct TestError: Error { }
             var nextError: Error? = nil // If not null, observation throws an error
-            let observation = ValueObservation.trackingConstantRegion {
+            let observation = ValueObservation.tracking {
                 _ = try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM t")
                 if let error = nextError {
                     throw error
@@ -93,7 +93,7 @@ class ValueObservationTests: GRDBTestCase {
         var region: DatabaseRegion?
         let expectation = self.expectation(description: "")
         let observation = ValueObservation
-            .trackingConstantRegion(request.fetchAll)
+            .tracking(request.fetchAll)
             .handleEvents(willTrackRegion: {
                 region = $0
                 expectation.fulfill()
@@ -105,39 +105,6 @@ class ValueObservationTests: GRDBTestCase {
         withExtendedLifetime(observer) {
             waitForExpectations(timeout: 2, handler: nil)
             XCTAssertEqual(region!.description, "t(id,name)") // view is NOT tracked
-        }
-    }
-    
-    func testPragmaTableOptimization() throws {
-        let dbQueue = try makeDatabaseQueue()
-        try dbQueue.write {
-            try $0.execute(sql: """
-                CREATE TABLE t(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);
-                """)
-        }
-        
-        struct T: TableRecord { }
-        
-        // A request that requires a pragma introspection query
-        let request = T.filter(key: 1).asRequest(of: Row.self)
-        
-        // Test that no pragma table is included in the observed region.
-        // This optimization helps observation that feed from a single table.
-        var region: DatabaseRegion?
-        let expectation = self.expectation(description: "")
-        let observation = ValueObservation
-            .trackingConstantRegion(request.fetchAll)
-            .handleEvents(willTrackRegion: {
-                region = $0
-                expectation.fulfill()
-            })
-        let observer = observation.start(
-            in: dbQueue,
-            onError: { error in XCTFail("Unexpected error: \(error)") },
-            onChange: { _ in })
-        withExtendedLifetime(observer) {
-            waitForExpectations(timeout: 2, handler: nil)
-            XCTAssertEqual(region!.description, "t(id,name)[1]") // pragma_table_xinfo is NOT tracked
         }
     }
     
@@ -153,7 +120,7 @@ class ValueObservationTests: GRDBTestCase {
         // its first read access, and its write access that installs the
         // transaction observer, some write did happen.
         var needsChange = true
-        let observation = ValueObservation.trackingConstantRegion { db -> Int in
+        let observation = ValueObservation.tracking { db -> Int in
             if needsChange {
                 needsChange = false
                 try dbPool.write { db in
@@ -193,7 +160,7 @@ class ValueObservationTests: GRDBTestCase {
         // its first read access, and its write access that installs the
         // transaction observer, some write did happen.
         var needsChange = true
-        let observation = ValueObservation.trackingConstantRegion { db -> Int in
+        let observation = ValueObservation.tracking { db -> Int in
             if needsChange {
                 needsChange = false
                 try dbPool.write { db in
@@ -233,7 +200,7 @@ class ValueObservationTests: GRDBTestCase {
         // its first read access, and its write access that installs the
         // transaction observer, no write did happen.
         var needsChange = true
-        let observation = ValueObservation.trackingConstantRegion { db -> Int in
+        let observation = ValueObservation.tracking { db -> Int in
             if needsChange {
                 needsChange = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -292,7 +259,7 @@ class ValueObservationTests: GRDBTestCase {
         // its first read access, and its write access that installs the
         // transaction observer, no write did happen.
         var needsChange = true
-        let observation = ValueObservation.trackingConstantRegion { db -> Int in
+        let observation = ValueObservation.tracking { db -> Int in
             if needsChange {
                 needsChange = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -355,7 +322,7 @@ class ValueObservationTests: GRDBTestCase {
         notificationExpectation.expectedFulfillmentCount = 2
         
         // Create an observation
-        let observation = ValueObservation.trackingConstantRegion {
+        let observation = ValueObservation.tracking {
             try Int.fetchOne($0, sql: "SELECT * FROM t")
         }
         
@@ -401,7 +368,7 @@ class ValueObservationTests: GRDBTestCase {
         notificationExpectation.expectedFulfillmentCount = 2
         
         // Create an observation
-        let observation = ValueObservation.trackingConstantRegion {
+        let observation = ValueObservation.tracking {
             try Int.fetchOne($0, sql: "SELECT * FROM t")
         }
         

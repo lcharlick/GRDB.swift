@@ -289,10 +289,6 @@ public class TableAlias: Hashable {
     }
     
     func becomeProxy(of base: TableAlias) {
-        if self === base {
-            return
-        }
-        
         switch impl {
         case let .undefined(userName):
             if let userName = userName {
@@ -316,10 +312,6 @@ public class TableAlias: Hashable {
     
     /// Returns nil if aliases can't be merged (conflict in tables, aliases...)
     func merged(with other: TableAlias) -> TableAlias? {
-        if self === other {
-            return self
-        }
-        
         let root = self.root
         let otherRoot = other.root
         switch (root.impl, otherRoot.impl) {
@@ -395,7 +387,7 @@ public class TableAlias: Hashable {
     public subscript(_ column: String) -> SQLExpression {
         Column(column)._qualifiedExpression(with: self)
     }
-    
+
     /// [**Experimental**](http://github.com/groue/GRDB.swift#what-are-experimental-features)
     ///
     /// An expression that evaluates to true if the record refered by this
@@ -413,7 +405,7 @@ public class TableAlias: Hashable {
     ///     }
     public var exists: SQLExpression {
         // TODO: this fails with SQL views. Can we do something?
-        SQLExpressionQualifiedFastPrimaryKey(alias: self) != nil
+        _SQLExpressionQualifiedFastPrimaryKey(alias: self) != nil
     }
     
     /// :nodoc:

@@ -1,3 +1,5 @@
+// MARK: - SQLOrderingTerm
+
 /// Implementation details of `SQLOrderingTerm`.
 ///
 /// :nodoc:
@@ -8,24 +10,23 @@ public protocol _SQLOrderingTerm {
     /// Returns a qualified ordering
     func _qualifiedOrdering(with alias: TableAlias) -> SQLOrderingTerm
     
-    /// Returns the SQL that feeds the `ORDER BY` clause.
-    ///
-    /// - parameter context: An SQL generation context which accepts
-    ///   statement arguments.
-    func _orderingTermSQL(_ context: SQLGenerationContext) throws -> String
+    /// Accepts a visitor
+    func _accept<Visitor: _SQLOrderingTermVisitor>(_ visitor: inout Visitor) throws
 }
 
 /// The protocol for all types that can be used as an SQL ordering term, as
 /// described at https://www.sqlite.org/syntax/ordering-term.html
 public protocol SQLOrderingTerm: _SQLOrderingTerm { }
 
+// MARK: - _SQLOrdering
+
 /// :nodoc:
-enum SQLOrdering: SQLOrderingTerm, Refinable {
+public enum _SQLOrdering: SQLOrderingTerm, Refinable {
     case asc(SQLExpression)
     case desc(SQLExpression)
     
-    // Only available from SQLite 3.30.0. This enum is not public, so those
-    // cases don't harm as long as we don't expose them through public APIs.
+    // Only available from 3.30.0. This enum is not public, so those cases don't
+    // harm as long as we don't expose them through public APIs.
     case ascNullsLast(SQLExpression)
     case descNullsFirst(SQLExpression)
     
@@ -56,33 +57,27 @@ enum SQLOrdering: SQLOrderingTerm, Refinable {
         }
     }
     
-    func _orderingTermSQL(_ context: SQLGenerationContext) throws -> String {
+    /// :nodoc:
+    public var _reversed: SQLOrderingTerm {
         switch self {
         case .asc(let expression):
-            return try expression._expressionSQL(context, wrappedInParenthesis: false) + " ASC"
+            return _SQLOrdering.desc(expression)
         case .desc(let expression):
-            return try expression._expressionSQL(context, wrappedInParenthesis: false) + " DESC"
+            return _SQLOrdering.asc(expression)
         case .ascNullsLast(let expression):
-            return try expression._expressionSQL(context, wrappedInParenthesis: false) + " ASC NULLS LAST"
+            return _SQLOrdering.descNullsFirst(expression)
         case .descNullsFirst(let expression):
-            return try expression._expressionSQL(context, wrappedInParenthesis: false) + " DESC NULLS FIRST"
+            return _SQLOrdering.ascNullsLast(expression)
         }
     }
     
-    func _qualifiedOrdering(with alias: TableAlias) -> SQLOrderingTerm {
+    /// :nodoc:
+    public func _qualifiedOrdering(with alias: TableAlias) -> SQLOrderingTerm {
         map(\.expression) { $0._qualifiedExpression(with: alias) }
     }
     
-    var _reversed: SQLOrderingTerm {
-        switch self {
-        case .asc(let expression):
-            return SQLOrdering.desc(expression)
-        case .desc(let expression):
-            return SQLOrdering.asc(expression)
-        case .ascNullsLast(let expression):
-            return SQLOrdering.descNullsFirst(expression)
-        case .descNullsFirst(let expression):
-            return SQLOrdering.ascNullsLast(expression)
-        }
+    /// :nodoc:
+    public func _accept<Visitor: _SQLOrderingTermVisitor>(_ visitor: inout Visitor) throws {
+        try visitor.visit(self)
     }
 }

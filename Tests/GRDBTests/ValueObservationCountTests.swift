@@ -6,7 +6,7 @@ class ValueObservationCountTests: GRDBTestCase {
         struct T: TableRecord { }
         
         try assertValueObservation(
-            ValueObservation.trackingConstantRegion(T.fetchCount),
+            ValueObservation.tracking(T.fetchCount),
             records: [0, 1, 1, 2, 3, 4],
             setup: { db in
                 try db.execute(sql: "CREATE TABLE t(id INTEGER PRIMARY KEY AUTOINCREMENT)")
@@ -29,7 +29,7 @@ class ValueObservationCountTests: GRDBTestCase {
         struct T: TableRecord { }
         
         try assertValueObservation(
-            ValueObservation.trackingConstantRegion(T.fetchCount).removeDuplicates(),
+            ValueObservation.tracking(T.fetchCount).removeDuplicates(),
             records: [0, 1, 2, 3, 4],
             setup: { db in
                 try db.execute(sql: "CREATE TABLE t(id INTEGER PRIMARY KEY AUTOINCREMENT)")

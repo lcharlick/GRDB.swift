@@ -174,7 +174,6 @@ class AssociationHasManyThroughSQLTests: GRDBTestCase {
         where
         BAssociation: Association,
         CAssociation: Association,
-        BAssociation.OriginRowDecoder: TableRecord,
         BAssociation.OriginRowDecoder == CAssociation.OriginRowDecoder
     {
         let A = BAssociation.OriginRowDecoder.self

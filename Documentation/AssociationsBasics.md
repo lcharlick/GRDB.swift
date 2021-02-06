@@ -11,7 +11,6 @@ GRDB Associations
     - [HasOneThrough]
     - [Choosing Between BelongsTo and HasOne]
     - [Self Joins]
-    - [Associations to Common Table Expressions]
 - [Associations and the Database Schema]
     - [Convention for Database Table Names]
     - [Convention for the BelongsTo Association]
@@ -192,20 +191,17 @@ Generally speaking, associations use the [TableRecord], [FetchableRecord], and [
 The Types of Associations
 =========================
 
-GRDB handles several types of associations:
+GRDB handles five types of associations:
 
 - **BelongsTo**
 - **HasMany**
 - **HasOne**
 - **HasManyThrough**
 - **HasOneThrough**
-- **Associations to common table expressions**
 
-An association generally declares a link from a record type to another, as in "one book **belongs to** its author". It instructs GRDB to use the foreign keys declared in the database as support for Swift methods.
+An association declares a link from a record type to another, as in "one book **belongs to** its author". It instructs GRDB to use the foreign keys declared in the database as support for Swift methods.
 
 Each one of these associations is appropriate for a particular database situation.
-
-Associations to [common table expressions] are specific enough and are documented in [Associations to Common Table Expressions].
 
 - [BelongsTo]
 - [HasMany]
@@ -697,7 +693,7 @@ See [Foreign Keys] for more information.
 
 **Associations can automatically infer the foreign keys that define how two database tables are linked together.**
 
-In the example below, the `book.authorId` column is automatically used to link a book to its author, because the database schema defines a foreign key between the book and author database tables (see [Convention for the BelongsTo Association]).
+In the example below, the `book.authorId` column is automatically used to link a book to its author:
 
 ![BelongsToSchema](https://cdn.rawgit.com/groue/GRDB.swift/master/Documentation/Images/Associations2/BelongsToSchema.svg)
 
@@ -711,9 +707,7 @@ struct Author: TableRecord {
 }
 ```
 
-> :point_up: **Note**: Generally speaking, all foreign keys are supported, including composite keys that span several columns.
->
-> :warning: **Warning**: SQLite voids foreign key constraints when one or more of a foreign key column is NULL (see [SQLite Foreign Key Support](https://www.sqlite.org/foreignkeys.html)). GRDB does not match foreign keys that involve a NULL value either.
+But this requires the database schema to define a foreign key between the book and author database tables (see [Convention for the BelongsTo Association]).
 
 Sometimes the database schema does not define any foreign key. And sometimes, there are *several* foreign keys from a table to another.
 
@@ -2379,7 +2373,7 @@ See [Good Practices for Designing Record Types] for more information.
         .including(all: Country.passports
             .including(required: Passport.citizen))
     ```
-
+    
 Come [discuss](http://twitter.com/groue) for more information, or if you wish to help turning those missing features into reality.
 
 ---
@@ -2482,5 +2476,3 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 [database observation tools]: ../README.md#database-changes-observation
 [ValueObservation]: ../README.md#valueobservation
 [FAQ]: ../README.md#faq-associations
-[common table expressions]: CommonTableExpressions.md
-[Associations to Common Table Expressions]: CommonTableExpressions.md#associations-to-common-table-expressions

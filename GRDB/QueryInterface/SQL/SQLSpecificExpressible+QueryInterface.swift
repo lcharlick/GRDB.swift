@@ -7,14 +7,14 @@ extension SQLSpecificExpressible {
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     public var asc: SQLOrderingTerm {
-        SQLOrdering.asc(sqlExpression)
+        _SQLOrdering.asc(sqlExpression)
     }
     
     /// Returns a value that can be used as an argument to QueryInterfaceRequest.order()
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     public var desc: SQLOrderingTerm {
-        SQLOrdering.desc(sqlExpression)
+        _SQLOrdering.desc(sqlExpression)
     }
     
     #if GRDBCUSTOMSQLITE
@@ -22,14 +22,14 @@ extension SQLSpecificExpressible {
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     public var ascNullsLast: SQLOrderingTerm {
-        SQLOrdering.ascNullsLast(sqlExpression)
+        _SQLOrdering.ascNullsLast(sqlExpression)
     }
     
     /// Returns a value that can be used as an argument to QueryInterfaceRequest.order()
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     public var descNullsFirst: SQLOrderingTerm {
-        SQLOrdering.descNullsFirst(sqlExpression)
+        _SQLOrdering.descNullsFirst(sqlExpression)
     }
     #elseif !GRDBCIPHER
     /// Returns a value that can be used as an argument to QueryInterfaceRequest.order()
@@ -37,7 +37,7 @@ extension SQLSpecificExpressible {
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     @available(OSX 10.16, iOS 14, tvOS 14, watchOS 7, *)
     public var ascNullsLast: SQLOrderingTerm {
-        SQLOrdering.ascNullsLast(sqlExpression)
+        _SQLOrdering.ascNullsLast(sqlExpression)
     }
     
     /// Returns a value that can be used as an argument to QueryInterfaceRequest.order()
@@ -45,7 +45,7 @@ extension SQLSpecificExpressible {
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     @available(OSX 10.16, iOS 14, tvOS 14, watchOS 7, *)
     public var descNullsFirst: SQLOrderingTerm {
-        SQLOrdering.descNullsFirst(sqlExpression)
+        _SQLOrdering.descNullsFirst(sqlExpression)
     }
     #endif
 }
@@ -66,7 +66,7 @@ extension SQLSpecificExpressible {
     ///         let area: Int = row["area"]
     ///     }
     public func forKey(_ key: String) -> SQLSelectable {
-        SQLAliasedExpression(sqlExpression, name: key)
+        _SQLAliasedExpression(sqlExpression, name: key)
     }
     
     /// Give the expression the same SQL name as the coding key.

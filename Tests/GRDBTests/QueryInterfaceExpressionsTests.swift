@@ -1342,7 +1342,7 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
             "SELECT avgOf(\"age\", 1, 2) FROM \"readers\"")
     }
     
-    // MARK: - SQLExpressionFastPrimaryKey
+    // MARK: - _SQLExpressionFastPrimaryKey
     
     func testFastPrimaryKeyExpression() throws {
         struct IntegerPrimaryKeyRecord: TableRecord { }
@@ -1361,19 +1361,19 @@ class QueryInterfaceExpressionsTests: GRDBTestCase {
                 CREATE TABLE compoundPrimaryKeyRecord (a INTEGER, b INTEGER, PRIMARY KEY (a, b));
                 """)
             
-            try assertEqualSQL(db, IntegerPrimaryKeyRecord.select(SQLExpressionFastPrimaryKey()), """
+            try assertEqualSQL(db, IntegerPrimaryKeyRecord.select(_SQLExpressionFastPrimaryKey()), """
                 SELECT "id" FROM "integerPrimaryKeyRecord"
                 """)
-            try assertEqualSQL(db, UUIDRecord.select(SQLExpressionFastPrimaryKey()), """
+            try assertEqualSQL(db, UUIDRecord.select(_SQLExpressionFastPrimaryKey()), """
                 SELECT "rowid" FROM "uuidRecord"
                 """)
-            try assertEqualSQL(db, UUIDRecordWithoutRowID.select(SQLExpressionFastPrimaryKey()), """
+            try assertEqualSQL(db, UUIDRecordWithoutRowID.select(_SQLExpressionFastPrimaryKey()), """
                 SELECT "uuid" FROM "uuidRecordWithoutRowID"
                 """)
-            try assertEqualSQL(db, RowIDRecord.select(SQLExpressionFastPrimaryKey()), """
+            try assertEqualSQL(db, RowIDRecord.select(_SQLExpressionFastPrimaryKey()), """
                 SELECT "rowid" FROM "rowIDRecord"
                 """)
-            try assertEqualSQL(db, CompoundPrimaryKeyRecord.select(SQLExpressionFastPrimaryKey()), """
+            try assertEqualSQL(db, CompoundPrimaryKeyRecord.select(_SQLExpressionFastPrimaryKey()), """
                 SELECT "rowid" FROM "compoundPrimaryKeyRecord"
                 """)
         }

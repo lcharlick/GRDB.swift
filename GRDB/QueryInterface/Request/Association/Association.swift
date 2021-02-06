@@ -25,7 +25,7 @@ public protocol Association: _Association, DerivableRequest {
     ///         // BelongsToAssociation<Book, Author>
     ///         static let author = belongsTo(Author.self)
     ///     }
-    associatedtype OriginRowDecoder
+    associatedtype OriginRowDecoder: TableRecord
     
     /// Creates an association with the given key.
     ///
@@ -292,9 +292,7 @@ extension Association {
 // TableRequest
 extension Association {
     /// :nodoc:
-    public var databaseTableName: String {
-        _sqlAssociation.destination.relation.source.tableName
-    }
+    public var databaseTableName: String { RowDecoder.databaseTableName }
 }
 
 // MARK: - AssociationToOne

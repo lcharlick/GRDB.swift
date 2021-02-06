@@ -123,7 +123,12 @@ public struct _SQLAssociation {
                 // children are useless:
                 let relation = step.relation
                     .selectOnly([])
-                    .removingChildrenForPrefetchedAssociations()
+                    .filteringChildren({
+                         switch $0.kind {
+                         case .allPrefetched, .allNotPrefetched: return false
+                         case .oneRequired, .oneOptional: return true
+                         }
+                     })
                 
                 // Don't interfere with user-defined keys that could be added later
                 let key = step.key.map(\.baseName) { "grdb_\($0)" }
@@ -148,21 +153,21 @@ struct SQLAssociationStep: Refinable {
     var relation: SQLRelation
     var cardinality: SQLAssociationCardinality
     
-    var keyName: String { key.name(singular: cardinality.isSingular) }
-}
-
-enum SQLAssociationCardinality {
-    case toOne
-    case toMany
-    
     var isSingular: Bool {
-        switch self {
+        switch cardinality {
         case .toOne:
             return true
         case .toMany:
             return false
         }
     }
+    
+    var keyName: String { key.name(singular: isSingular) }
+}
+
+enum SQLAssociationCardinality {
+    case toOne
+    case toMany
 }
 
 // MARK: - SQLAssociationKey
